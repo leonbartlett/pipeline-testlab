@@ -1,72 +1,57 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
-# All Vagrant configuration is done below. The "2" in Vagrant.configure
-# configures the configuration version (we support older styles for
-# backwards compatibility). Please don't change it unless you know what
-# you're doing.
 Vagrant.configure("2") do |config|
-  # The most common configuration options are documented and commented below.
-  # For a complete reference, please see the online documentation at
-  # https://docs.vagrantup.com.
 
-  # Every Vagrant development environment requires a box. You can search for
-  # boxes at https://atlas.hashicorp.com/search.
-  config.vm.box = "base"
-  config.vm.box_version = "0.0.1"
+  if Vagrant.has_plugin?("vagrant-proxyconf")
+    config.proxy.http     = "http://internetgateway.cdf.atradiusnet.com:8080"
+    config.proxy.https    = "http://internetgateway.cdf.atradiusnet.com:8080"
+    config.proxy.no_proxy = "localhost,127.0.0.1,.example.com,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+  end
+  
+  config.vm.define "util" , primary: true do |util|
 
-  # Disable automatic box update checking. If you disable this, then
-  # boxes will only be checked for updates when the user runs
-  # `vagrant box outdated`. This is not recommended.
-  # config.vm.box_check_update = false
+    util.vm.box = "centos-7-1611-x86_64"
+    util.vm.box_url = "/projects/vagrantboxes/centos-7-1611-x86_64.box"
 
-  # Create a forwarded port mapping which allows access to a specific port
-  # within the machine from a port on the host machine. In the example below,
-  # accessing "localhost:8080" will access port 80 on the guest machine.
-  # config.vm.network "forwarded_port", guest: 80, host: 8080
+    util.vm.hostname = "util.example.com"
+    util.vm.synced_folder ".", "/vagrant", :mount_options => ["dmode=777","fmode=777"]
+    #util.vm.synced_folder "/software/Oracle_Software/fmw/12.2.1/installers", "/software"
 
-  # Create a private network, which allows host-only access to the machine
-  # using a specific IP.
-  # config.vm.network "private_network", ip: "192.168.33.10"
+    util.vm.network :private_network, ip: "10.10.11.2"
+    #util.vm.network "forwarded_port", guest: 7001, host:9001, auto_correct: true
 
-  # Create a public network, which generally matched to bridged network.
-  # Bridged networks make the machine appear as another physical device on
-  # your network.
-  # config.vm.network "public_network"
+    util.vm.provider :virtualbox do |vb|
+      vb.customize ["modifyvm", :id, "--memory", "2024"]
+      vb.customize ["modifyvm", :id, "--name"  , "util"]
+      vb.customize ["modifyvm", :id, "--cpus"  , 2]
+    end
 
-  # Share an additional folder to the guest VM. The first argument is
-  # the path on the host to the actual folder. The second argument is
-  # the path on the guest to mount the folder. And the optional third
-  # argument is a set of non-required options.
-  # config.vm.synced_folder "../data", "/vagrant_data"
+    util.vm.provision :shell, :inline => "ln -sf /vagrant/puppet/hiera.yaml /etc/puppetlabs/code/hiera.yaml;rm -rf /etc/puppetlabs/code/modules;ln -sf /vagrant/puppet/environments/development/modules /etc/puppetlabs/code/modules"
 
-  # Provider-specific configuration so you can fine-tune various
-  # backing providers for Vagrant. These expose provider-specific options.
-  # Example for VirtualBox:
-  #
-  # config.vm.provider "virtualbox" do |vb|
-  #   # Display the VirtualBox GUI when booting the machine
-  #   vb.gui = true
-  #
-  #   # Customize the amount of memory on the VM:
-  #   vb.memory = "1024"
-  # end
-  #
-  # View the documentation for the provider you are using for more
-  # information on available options.
 
-  # Define a Vagrant Push strategy for pushing to Atlas. Other push strategies
-  # such as FTP and Heroku are also available. See the documentation at
-  # https://docs.vagrantup.com/v2/push/atlas.html for more information.
-  # config.push.define "atlas" do |push|
-  #   push.app = "YOUR_ATLAS_USERNAME/YOUR_APPLICATION_NAME"
-  # end
+    util.vm.provision :puppet do |puppet|
 
-  # Enable provisioning with a shell script. Additional provisioners such as
-  # Puppet, Chef, Ansible, Salt, and Docker are also available. Please see the
-  # documentation for more information about their specific syntax and use.
-  # config.vm.provision "shell", inline: <<-SHELL
-  #   apt-get update
-  #   apt-get install -y apache2
-  # SHELL
+      puppet.environment_path     = "puppet/environments"
+      puppet.environment          = "development"
+
+      puppet.manifests_path       = "puppet/environments/development/manifests"
+      puppet.manifest_file        = "site.pp"
+
+      puppet.options           = [
+                                  '--verbose',
+                                  '--report',
+                                  '--trace',
+                                  # '--debug',
+#                                  '--parser future',
+                                  '--strict_variables',
+                                  '--hiera_config /vagrant/puppet/hiera.yaml'
+                                 ]
+      puppet.facter = {
+        "environment"     => "development",
+        "vm_type"         => "vagrant",
+      }
+
+    end
+  end
 end

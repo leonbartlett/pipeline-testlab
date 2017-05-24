@@ -1,0 +1,9 @@
+---
+
+hosts:
+  'util.example.com':
+    ip:           "10.10.11.2"
+    host_aliases: 'until'
+  'localhost':
+    ip:           "127.0.0.1"
+    host_aliases: 'localhost.localdomain,localhost4,localhost4.localdomain4'
